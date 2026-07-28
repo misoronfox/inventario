@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario del Hogar Dinámico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen font-sans">
+
+    <!-- HEADER -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="goToDashboard()">
+                <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                    <i data-lucide="home" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900">Mi Inventario</h1>
+                    <p class="text-xs text-gray-500">Gestión en Servidor</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <button onclick="openAddProductModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center shadow-sm transition">
+                    <i data-lucide="plus" class="w-4 h-4 mr-1.5"></i> Agregar Producto
+                </button>
+                <button onclick="showShoppingList()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold flex items-center transition relative">
+                    <i data-lucide="shopping-basket" class="w-4 h-4 mr-1.5"></i> Lista de Compra
+                    <span id="shopping-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold hidden">0</span>
+                </button>
+                <button onclick="showReports()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold flex items-center transition">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4 mr-1.5"></i> Informe
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="max-w-6xl mx-auto px-4 py-6">
+
+        <!-- RESUMEN DE ESTADO (FILTRABLE CON CLICS) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div onclick="filterByStatus('red')" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center space-x-4 cursor-pointer hover:border-red-400 hover:shadow transition">
+                <div class="p-3 bg-red-100 text-red-600 rounded-lg"><i data-lucide="alert-triangle"></i></div>
+                <div>
+                    <p class="text-sm text-gray-500 font-medium">Bajo Mínimo (Crítico)</p>
+                    <p id="stat-red" class="text-2xl font-bold text-gray-900">0</p>
+                </div>
+            </div>
+            <div onclick="filterByStatus('yellow')" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center space-x-4 cursor-pointer hover:border-yellow-400 hover:shadow transition">
+                <div class="p-3 bg-yellow-100 text-yellow-600 rounded-lg"><i data-lucide="alert-circle"></i></div>
+                <div>
+                    <p class="text-sm text-gray-500 font-medium">Cerca del Mínimo</p>
+                    <p id="stat-yellow" class="text-2xl font-bold text-gray-900">0</p>
+                </div>
+            </div>
+            <div onclick="filterByStatus('green')" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center space-x-4 cursor-pointer hover:border-green-400 hover:shadow transition">
+                <div class="p-3 bg-green-100 text-green-600 rounded-lg"><i data-lucide="check-circle-2"></i></div>
+                <div>
+                    <p class="text-sm text-gray-500 font-medium">Suficiente Stock</p>
+                    <p id="stat-green" class="text-2xl font-bold text-gray-900">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 1: DASHBOARD DE CATEGORÍAS DINÁMICAS -->
+        <section id="view-dashboard" class="space-y-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4 font-mono uppercase tracking-wide">Categorías Disponibles</h2>
+            <div id="dynamic-categories-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Se rellena dinámicamente -->
+            </div>
+        </section>
+
+        <!-- VISTA 2: LISTADO DE PRODUCTOS (FILTRADO POR CATEGORÍA O ESTADO) -->
+        <section id="view-category" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <button onclick="goToDashboard()" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 flex items-center transition">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i> Volver al Inicio
+                </button>
+                <h2 id="category-title" class="text-2xl font-bold text-gray-900">Productos</h2>
+            </div>
+
+            <!-- Contenedor dinámico de Subcategorías -->
+            <div id="subcategory-filters-container" class="hidden">
+                <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Subcategoría:</p>
+                <div id="subcategory-tabs" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            <div id="product-grid-empty" class="hidden bg-white text-center py-12 rounded-xl border border-gray-200">
+                <i data-lucide="package-search" class="w-12 h-12 mx-auto text-gray-300 mb-3"></i>
+                <p class="text-gray-500 font-medium">No se encontraron productos coincidentes.</p>
+            </div>
+        </section>
+
+        <!-- VISTA 3: LISTA DE COMPRAS -->
+        <section id="view-shopping-list" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <button onclick="goToDashboard()" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 flex items-center transition">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i> Volver al Inicio
+                </button>
+                <h2 class="text-2xl font-bold text-gray-900">Lista de Compras</h2>
+            </div>
+            <div id="shopping-list-container" class="space-y-6"></div>
+            <div id="shopping-list-empty" class="hidden bg-white text-center py-12 rounded-xl border border-gray-200">
+                <i data-lucide="smile" class="w-12 h-12 mx-auto text-green-500 mb-3"></i>
+                <p class="text-gray-500 font-medium">No tienes compras pendientes.</p>
+            </div>
+        </section>
+
+        <!-- VISTA 4: INFORME / CONSUMO -->
+        <section id="view-reports" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <button onclick="goToDashboard()" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 flex items-center transition">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i> Volver al Inicio
+                </button>
+                <h2 class="text-2xl font-bold text-gray-900">Informe de Gestión</h2>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h3 class="text-base font-bold text-gray-900 mb-4">Stock actual por Categoría</h3>
+                    <div class="relative h-64"><canvas id="chartStockDistribution"></canvas></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                    <h3 class="text-base font-bold text-gray-900 mb-4">Consumo Acumulado</h3>
+                    <div class="relative h-64"><canvas id="chartConsumption"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL: AGREGAR / EDITAR PRODUCTO -->
+    <div id="product-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 id="modal-title" class="text-lg font-bold text-gray-900">Ficha de Producto</h3>
+                <button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            
+            <form id="product-form" onsubmit="saveProduct(event)" class="overflow-y-auto p-6 space-y-4">
+                <input type="hidden" id="form-product-id">
+                
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre *</label>
+                    <input type="text" id="form-name" required class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
+                    <textarea id="form-desc" class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 h-16"></textarea>
+                </div>
+
+                <!-- CATEGORÍA SELECCIONABLE / CREABLE -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Categoría Principal *</label>
+                        <select id="form-category" onchange="handleCategoryChange()" required class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500"></select>
+                    </div>
+                    <div id="new-category-input-group" class="hidden">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre Nueva Categoría *</label>
+                        <input type="text" id="form-new-category-name" class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <!-- SUBCATEGORÍA SELECCIONABLE / CREABLE -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="subcategory-form-row">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Subcategoría *</label>
+                        <select id="form-subcategory" onchange="handleSubcategoryChange()" class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500"></select>
+                    </div>
+                    <div id="new-subcategory-input-group" class="hidden">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre Nueva Subcategoría *</label>
+                        <input type="text" id="form-new-subcategory-name" class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Precio ($) *</label>
+                        <input type="number" id="form-price" min="0" step="any" required class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Cantidad *</label>
+                        <input type="number" id="form-qty" min="0" required class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Min. Requerido *</label>
+                        <input type="number" id="form-min" min="0" required class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Foto del Producto</label>
+                    <input type="file" id="form-image" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                </div>
+
+                <div class="pt-4 border-t border-gray-200 flex justify-end space-x-2">
+                    <button type="button" onclick="closeProductModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold">Cancelar</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: GESTIÓN DE ACCIONES DE PRODUCTO -->
+    <div id="action-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div class="p-6">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center space-x-4">
+                        <img id="act-img" src="" class="w-16 h-16 object-cover rounded-lg border border-gray-200" alt="Producto">
+                        <div>
+                            <span id="act-badge" class="text-xs px-2.5 py-0.5 rounded-full font-bold">Estado</span>
+                            <h4 id="act-title" class="text-lg font-bold text-gray-900 mt-1">Nombre</h4>
+                            <p id="act-category" class="text-xs text-gray-500 font-medium">Categoría</p>
+                        </div>
+                    </div>
+                    <button onclick="closeActionModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+
+                <p id="act-desc" class="text-sm text-gray-600 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100 italic">Descripción...</p>
+
+                <div class="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4">
+                    <span class="text-sm font-semibold text-gray-700">Existencias actuales:</span>
+                    <div class="flex items-center space-x-3">
+                        <button id="btn-decrease" class="w-10 h-10 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 font-bold flex items-center justify-center">-</button>
+                        <span id="act-qty" class="text-lg font-bold w-12 text-center">0</span>
+                        <button id="btn-increase" class="w-10 h-10 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 font-bold flex items-center justify-center">+</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+                    <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <p class="text-xs text-gray-400 font-medium">Precio Unitario</p>
+                        <p id="act-price" class="text-base font-bold text-gray-900">$0.00</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <p class="text-xs text-gray-400 font-medium">Mínimo Requerido</p>
+                        <p id="act-min" class="text-base font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <button id="btn-add-shopping" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center">
+                        <i data-lucide="shopping-basket" class="w-4 h-4 mr-1.5"></i> Agregar a Lista de Compra
+                    </button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btn-edit-prod" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
+                            <i data-lucide="pencil" class="w-3.5 h-3.5 mr-1"></i> Editar Ficha
+                        </button>
+                        <button id="btn-delete-prod" class="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-xs transition flex items-center justify-center">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGICA JAVASCRIPT -->
+    <script>
+        let state = {
+            categories: [],
+            activeCategory: null,
+            activeSubcategory: null,
+            activeStatus: null
+        };
+
+        let chartStockDistInstance = null;
+        let chartConsumptionInstance = null;
+
+        // Cargar Dashboard inicial
+        async function init() {
+            await updateGlobalStats();
+            await loadMainCategories();
+            goToDashboard();
+        }
+
+        // Obtener estadísticas globales desde el backend
+        async function updateGlobalStats() {
+            try {
+                const res = await fetch('/api/reports');
+                const data = await res.json();
+                document.getElementById('stat-red').innerText = data.stats.red;
+                document.getElementById('stat-yellow').innerText = data.stats.yellow;
+                document.getElementById('stat-green').innerText = data.stats.green;
+            } catch (e) {
+                console.error("Error al actualizar estadísticas", e);
+            }
+        }
+
+        // Navegar al inicio
+        function goToDashboard() {
+            state.activeCategory = null;
+            state.activeSubcategory = null;
+            state.activeStatus = null;
+            showView('dashboard');
+            updateGlobalStats();
+        }
+
+        function showView(viewName) {
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-category').classList.add('hidden');
+            document.getElementById('view-shopping-list').classList.add('hidden');
+            document.getElementById('view-reports').classList.add('hidden');
+
+            if (viewName === 'dashboard') {
+                document.getElementById('view-dashboard').classList.remove('hidden');
+            } else if (viewName === 'category') {
+                document.getElementById('view-category').classList.remove('hidden');
+            } else if (viewName === 'shopping') {
+                document.getElementById('view-shopping-list').classList.remove('hidden');
+            } else if (viewName === 'reports') {
+                document.getElementById('view-reports').classList.remove('hidden');
+            }
+            lucide.createIcons();
+        }
+
+        // Cargar Categorías Dinámicas en el Dashboard
+        async function loadMainCategories() {
+            const res = await fetch('/api/categories');
+            state.categories = await res.json();
+            
+            const grid = document.getElementById('dynamic-categories-grid');
+            grid.innerHTML = '';
+
+            state.categories.forEach(cat => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md cursor-pointer transition hover:-translate-y-0.5 flex flex-col justify-between";
+                card.onclick = () => selectCategory(cat);
+
+                card.innerHTML = `
+                    <div>
+                        <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
+                            <i data-lucide="folder" class="w-5 h-5"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-gray-900">${cat.name}</h3>
+                        <p class="text-xs text-gray-400 mt-1">Ver productos de esta categoría.</p>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // Filtrar productos al hacer clic en las tarjetas de estado (Crítico, Poco, Suficiente)
+        async function filterByStatus(status) {
+            state.activeCategory = null;
+            state.activeSubcategory = null;
+            state.activeStatus = status;
+
+            let statusLabel = status === 'red' ? 'Crítico (Bajo Mínimo)' : status === 'yellow' ? 'Poco (Cerca del Mínimo)' : 'Suficiente';
+            document.getElementById('category-title').innerText = `Productos: Estado ${statusLabel}`;
+            document.getElementById('subcategory-filters-container').classList.add('hidden');
+
+            const res = await fetch(`/api/products?status=${status}`);
+            const products = await res.json();
+            renderProducts(products);
+            showView('category');
+        }
+
+        // Seleccionar una categoría principal
+        async function selectCategory(category) {
+            state.activeCategory = category;
+            state.activeSubcategory = null;
+            state.activeStatus = null;
+
+            document.getElementById('category-title').innerText = category.name;
+            
+            // Cargar subcategorías asociadas
+            const resSub = await fetch(`/api/categories?parent_id=${category.id}`);
+            const subcategories = await resSub.json();
+
+            const subContainer = document.getElementById('subcategory-filters-container');
+            const subTabs = document.getElementById('subcategory-tabs');
+            subTabs.innerHTML = '';
+
+            if (subcategories.length > 0) {
+                subContainer.classList.remove('hidden');
+                
+                // Botón "Todos"
+                const allBtn = document.createElement('button');
+                allBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm";
+                allBtn.innerText = "Todos";
+                allBtn.onclick = () => filterSubcategory(null, allBtn);
+                subTabs.appendChild(allBtn);
+
+                subcategories.forEach(sub => {
+                    const btn = document.createElement('button');
+                    btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 transition";
+                    btn.innerText = sub.name;
+                    btn.onclick = () => filterSubcategory(sub.id, btn);
+                    subTabs.appendChild(btn);
+                });
+            } else {
+                subContainer.classList.add('hidden');
+            }
+
+            // Cargar productos de la categoría
+            const resProd = await fetch(`/api/products?category_id=${category.id}`);
+            const products = await resProd.json();
+            renderProducts(products);
+            showView('category');
+        }
+
+        // Filtrar productos por subcategoría
+        async function filterSubcategory(subId, activeBtn) {
+            state.activeSubcategory = subId;
+
+            // Cambiar estilos de los botones activos
+            const buttons = document.querySelectorAll('#subcategory-tabs button');
+            buttons.forEach(b => {
+                b.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 transition";
+            });
+            activeBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm";
+
+            let url = `/api/products?category_id=${state.activeCategory.id}`;
+            if (subId) url += `&subcategory_id=${subId}`;
+
+            const res = await fetch(url);
+            const products = await res.json();
+            renderProducts(products);
+        }
+
+        // Renderizar cuadrícula de productos
+        function renderProducts(products) {
+            const grid = document.getElementById('product-grid');
+            const empty = document.getElementById('product-grid-empty');
+            grid.innerHTML = '';
+
+            if (products.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            grid.classList.remove('hidden');
+            empty.classList.add('hidden');
+
+            products.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md cursor-pointer transition flex flex-col";
+                card.onclick = () => openActionModal(p);
+
+                const imgUrl = p.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400';
+                
+                let badgeClass = 'bg-green-100 text-green-800 border-green-200';
+                let dotClass = 'bg-green-500';
+                let label = 'Suficiente';
+
+                if (p.status === 'red') {
+                    badgeClass = 'bg-red-100 text-red-800 border-red-200';
+                    dotClass = 'bg-red-500';
+                    label = 'Crítico';
+                } else if (p.status === 'yellow') {
+                    badgeClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                    dotClass = 'bg-yellow-500';
+                    label = 'Poco';
+                }
+
+                card.innerHTML = `
+                    <div class="relative h-40 bg-gray-100">
+                        <img src="${imgUrl}" class="w-full h-full object-cover" alt="${p.name}">
+                        <span class="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-xs font-bold border ${badgeClass} flex items-center shadow-sm">
+                            <span class="w-2 h-2 rounded-full ${dotClass} mr-1"></span>
+                            ${label}
+                        </span>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-bold text-gray-900 truncate">${p.name}</h3>
+                                <span class="text-xs font-semibold text-gray-500">${p.subcategory_name || p.category_name}</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 line-clamp-2">${p.description || 'Sin descripción'}</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <div>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Cantidad</p>
+                                <p class="text-sm font-bold text-gray-800">${p.quantity} / <span class="text-gray-400 font-medium text-xs">Mín: ${p.min_quantity}</span></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Precio</p>
+                                <p class="text-sm font-extrabold text-indigo-600">$${Number(p.price).toFixed(2)}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // --- GESTIÓN FORMULARIO: SELECTOR DINÁMICO DE CATEGORÍAS/CREAR NUEVO ---
+        
+        async function openAddProductModal() {
+            document.getElementById('modal-title').innerText = "Nuevo Producto";
+            document.getElementById('product-form').reset();
+            document.getElementById('form-product-id').value = '';
+
+            // Rellenar selectores
+            await loadCategoryDropdown();
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+
+        function closeProductModal() {
+            document.getElementById('product-modal').classList.add('hidden');
+        }
+
+        async function loadCategoryDropdown() {
+            const res = await fetch('/api/categories');
+            const mainCategories = await res.json();
+            const select = document.getElementById('form-category');
+            
+            select.innerHTML = '<option value="" disabled selected>-- Elige Categoría --</option>';
+            mainCategories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.innerText = cat.name;
+                select.appendChild(opt);
+            });
+
+            // Opción especial para creación sobre la marcha
+            const optNew = document.createElement('option');
+            optNew.value = 'NEW_CAT';
+            optNew.innerText = '+ Crear Nueva Categoría...';
+            select.appendChild(optNew);
+
+            // Ocultar fila de subcategoría por defecto
+            document.getElementById('subcategory-form-row').classList.add('hidden');
+            document.getElementById('new-category-input-group').classList.add('hidden');
+        }
+
+        // Manejar cambio en la Categoría del formulario
+        async function handleCategoryChange() {
+            const categorySelect = document.getElementById('form-category');
+            const newCatGroup = document.getElementById('new-category-input-group');
+            const subRow = document.getElementById('subcategory-form-row');
+
+            if (categorySelect.value === 'NEW_CAT') {
+                newCatGroup.classList.remove('hidden');
+                subRow.classList.add('hidden');
+                document.getElementById('form-new-category-name').required = true;
+            } else {
+                newCatGroup.classList.add('hidden');
+                subRow.classList.remove('hidden');
+                document.getElementById('form-new-category-name').required = false;
+                
+                // Cargar subcategorías dinámicas del padre elegido
+                await loadSubcategoryDropdown(categorySelect.value);
+            }
+        }
+
+        async function loadSubcategoryDropdown(parentId) {
+            const res = await fetch(`/api/categories?parent_id=${parentId}`);
+            const subs = await res.json();
+            const select = document.getElementById('form-subcategory');
+
+            select.innerHTML = '<option value="" disabled selected>-- Elige Subcategoría --</option>';
+            subs.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.innerText = s.name;
+                select.appendChild(opt);
+            });
+
+            const optNew = document.createElement('option');
+            optNew.value = 'NEW_SUBCAT';
+            optNew.innerText = '+ Crear Nueva Subcategoría...';
+            select.appendChild(optNew);
+
+            document.getElementById('new-subcategory-input-group').classList.add('hidden');
+        }
+
+        function handleSubcategoryChange() {
+            const subcategorySelect = document.getElementById('form-subcategory');
+            const newSubGroup = document.getElementById('new-subcategory-input-group');
+
+            if (subcategorySelect.value === 'NEW_SUBCAT') {
+                newSubGroup.classList.remove('hidden');
+                document.getElementById('form-new-subcategory-name').required = true;
+            } else {
+                newSubGroup.classList.add('hidden');
+                document.getElementById('form-new-subcategory-name').required = false;
+            }
+        }
+
+        // Guardar o Actualizar producto mediante formulario
+        async function saveProduct(event) {
+            event.preventDefault();
+
+            let categoryId = document.getElementById('form-category').value;
+            let subcategoryId = document.getElementById('form-subcategory').value;
+
+            // 1. Si se especificó una nueva Categoría Principal, crearla primero
+            if (categoryId === 'NEW_CAT') {
+                const newCatName = document.getElementById('form-new-category-name').value;
+                const catRes = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name: newCatName, parent_id: null })
+                });
+                const newCat = await catRes.json();
+                categoryId = newCat.id;
+            }
+
+            // 2. Si se especificó una nueva Subcategoría, crearla vinculada a la principal
+            if (subcategoryId === 'NEW_SUBCAT' || (categoryId && !subcategoryId)) {
+                const newSubName = document.getElementById('form-new-subcategory-name').value;
+                if (newSubName) {
+                    const subRes = await fetch('/api/categories', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ name: newSubName, parent_id: categoryId })
+                    });
+                    const newSub = await subRes.json();
+                    subcategoryId = newSub.id;
+                } else {
+                    subcategoryId = null;
+                }
+            }
+
+            // 3. Empaquetar y enviar el formulario con FormData (para subir la imagen)
+            const formData = new FormData();
+            formData.append('id', document.getElementById('form-product-id').value);
+            formData.append('name', document.getElementById('form-name').value);
+            formData.append('description', document.getElementById('form-desc').value);
+            formData.append('price', document.getElementById('form-price').value);
+            formData.append('quantity', document.getElementById('form-qty').value);
+            formData.append('min_quantity', document.getElementById('form-min').value);
+            formData.append('category_id', categoryId);
+            if (subcategoryId) formData.append('subcategory_id', subcategoryId);
+
+            const fileInput = document.getElementById('form-image');
+            if (fileInput.files[0]) {
+                formData.append('image', fileInput.files[0]);
+            }
+
+            await fetch('/api/products', {
+                method: 'POST',
+                body: formData
+            });
+
+            closeProductModal();
+            await loadMainCategories(); // Recargar el inicio por si hay categorías nuevas
+            
+            if (state.activeCategory) {
+                selectCategory(state.activeCategory);
+            } else {
+                goToDashboard();
+            }
+        }
+
+        // --- ACCIONES DIRECTAS EN FICHA DE PRODUCTO ---
+        let currentProduct = null;
+
+        function openActionModal(p) {
+            currentProduct = p;
+
+            const imgUrl = p.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=400';
+            document.getElementById('act-img').src = imgUrl;
+            document.getElementById('act-title').innerText = p.name;
+            document.getElementById('act-category').innerText = p.subcategory_name ? `${p.category_name} (${p.subcategory_name})` : p.category_name;
+            document.getElementById('act-desc').innerText = p.description || "Sin descripción.";
+            document.getElementById('act-qty').innerText = p.quantity;
+            document.getElementById('act-price').innerText = `$${Number(p.price).toFixed(2)}`;
+            document.getElementById('act-min').innerText = p.min_quantity;
+
+            const badge = document.getElementById('act-badge');
+            let badgeClass = 'bg-green-100 text-green-800 border-green-200';
+            let label = 'Suficiente';
+
+            if (p.status === 'red') {
+                badgeClass = 'bg-red-100 text-red-800 border-red-200';
+                label = 'Crítico';
+            } else if (p.status === 'yellow') {
+                badgeClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                label = 'Poco';
+            }
+            badge.className = `text-xs px-2.5 py-0.5 rounded-full font-bold border ${badgeClass}`;
+            badge.innerText = label;
+
+            // Configurar botones de acción
+            document.getElementById('btn-increase').onclick = () => updateQuantity(p.id, 1);
+            document.getElementById('btn-decrease').onclick = () => updateQuantity(p.id, -1);
+            document.getElementById('btn-add-shopping').onclick = () => addToShopping(p.id);
+            document.getElementById('btn-edit-prod').onclick = () => editProductForm(p);
+            document.getElementById('btn-delete-prod').onclick = () => deleteProduct(p.id);
+
+            document.getElementById('action-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeActionModal() {
+            document.getElementById('action-modal').classList.add('hidden');
+        }
+
+        async function updateQuantity(id, change) {
+            const res = await fetch(`/api/products/${id}/quantity`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ change })
+            });
+            const updated = await res.json();
+            
+            openActionModal(updated); // Actualizar modal
+
+            // Recargar listados de fondo
+            if (state.activeStatus) {
+                filterByStatus(state.activeStatus);
+            } else if (state.activeCategory) {
+                selectCategory(state.activeCategory);
+            }
+        }
+
+        async function addToShopping(productId) {
+            const res = await fetch('/api/shopping', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ product_id: productId })
+            });
+            if (res.ok) {
+                alert("Agregado con éxito a la lista de compras.");
+                closeActionModal();
+                updateShoppingBadge();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Error al agregar a la lista.");
+            }
+        }
+
+        async function editProductForm(p) {
+            closeActionModal();
+            
+            document.getElementById('modal-title').innerText = "Editar Producto";
+            document.getElementById('form-product-id').value = p.id;
+            document.getElementById('form-name').value = p.name;
+            document.getElementById('form-desc').value = p.description || '';
+            document.getElementById('form-price').value = p.price;
+            document.getElementById('form-qty').value = p.quantity;
+            document.getElementById('form-min').value = p.min_quantity;
+
+            // Precargar selectores dinámicos
+            await loadCategoryDropdown();
+            document.getElementById('form-category').value = p.category_id;
+            
+            // Forzar actualización manual del estado
+            const subRow = document.getElementById('subcategory-form-row');
+            subRow.classList.remove('hidden');
+            await loadSubcategoryDropdown(p.category_id);
+            if (p.subcategory_id) {
+                document.getElementById('form-subcategory').value = p.subcategory_id;
+            }
+
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+
+        async function deleteProduct(id) {
+            if (confirm("¿Estás seguro de que deseas eliminar este producto permanentemente?")) {
+                const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    closeActionModal();
+                    if (state.activeStatus) {
+                        filterByStatus(state.activeStatus);
+                    } else if (state.activeCategory) {
+                        selectCategory(state.activeCategory);
+                    } else {
+                        goToDashboard();
+                    }
+                }
+            }
+        }
+
+        // --- COMPRAS ---
+
+        async function showShoppingList() {
+            showView('shopping');
+            await renderShoppingList();
+        }
+
+        async function updateShoppingBadge() {
+            const res = await fetch('/api/shopping');
+            const list = await res.json();
+            const badge = document.getElementById('shopping-badge');
+            const pending = list.filter(i => !i.completed).length;
+
+            if (pending > 0) {
+                badge.innerText = pending;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        async function renderShoppingList() {
+            const container = document.getElementById('shopping-list-container');
+            const empty = document.getElementById('shopping-list-empty');
+            container.innerHTML = '';
+
+            const res = await fetch('/api/shopping');
+            const list = await res.json();
+
+            if (list.length === 0) {
+                container.classList.add('hidden');
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            empty.classList.add('hidden');
+
+            // Agrupar compras por categoría
+            const grouped = list.reduce((acc, item) => {
+                if (!acc[item.category_name]) acc[item.category_name] = [];
+                acc[item.category_name].push(item);
+                return acc;
+            }, {});
+
+            for (const cat in grouped) {
+                const block = document.createElement('div');
+                block.className = "bg-white p-6 rounded-xl border border-gray-200 shadow-sm";
+                
+                let itemsHTML = '';
+                grouped[cat].forEach(item => {
+                    const checkClass = item.completed ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 bg-white';
+                    const iconCheck = item.completed ? '<i data-lucide="check" class="w-4 h-4"></i>' : '';
+                    const strikeClass = item.completed ? 'line-through text-gray-400' : 'text-gray-800';
+
+                    itemsHTML += `
+                        <div class="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                            <div class="flex items-center space-x-3">
+                                <button onclick="toggleShoppingItem(${item.id})" class="w-6 h-6 rounded-md border flex items-center justify-center transition ${checkClass}">
+                                    ${iconCheck}
+                                </button>
+                                <span class="text-sm font-semibold ${strikeClass}">${item.name}</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded">$${Number(item.price).toFixed(2)}</span>
+                                <button onclick="deleteShoppingItem(${item.id})" class="text-gray-400 hover:text-red-500 transition"><i data-lucide="trash" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                block.innerHTML = `
+                    <div class="flex items-center space-x-2 mb-3 pb-2 border-b border-gray-200">
+                        <span class="w-3 h-3 rounded-full bg-indigo-500"></span>
+                        <h3 class="text-sm font-extrabold text-gray-900 uppercase tracking-wider">${cat}</h3>
+                    </div>
+                    <div class="divide-y divide-gray-100">${itemsHTML}</div>
+                `;
+                container.appendChild(block);
+            }
+            lucide.createIcons();
+            updateShoppingBadge();
+        }
+
+        async function toggleShoppingItem(id) {
+            await fetch(`/api/shopping/${id}`, { method: 'PATCH' });
+            await renderShoppingList();
+        }
+
+        async function deleteShoppingItem(id) {
+            await fetch(`/api/shopping/${id}`, { method: 'DELETE' });
+            await renderShoppingList();
+        }
+
+        // --- INFORMES ---
+
+        async function showReports() {
+            showView('reports');
+            
+            const res = await fetch('/api/reports');
+            const data = await res.json();
+
+            // Gráfico 1: Distribución actual
+            const keysStock = Object.keys(data.stock_distribution);
+            const valsStock = Object.values(data.stock_distribution);
+
+            if (chartStockDistInstance) chartStockDistInstance.destroy();
+            chartStockDistInstance = new Chart(document.getElementById('chartStockDistribution').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: keysStock,
+                    datasets: [{
+                        data: valsStock,
+                        backgroundColor: ['#6366f1', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Gráfico 2: Consumos acumulados
+            const keysCons = Object.keys(data.consumption_distribution);
+            const valsCons = Object.values(data.consumption_distribution);
+
+            if (chartConsumptionInstance) chartConsumptionInstance.destroy();
+            chartConsumptionInstance = new Chart(document.getElementById('chartConsumption').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: keysCons,
+                    datasets: [{
+                        label: 'Unidades',
+                        data: valsCons,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+
+        // Inicialización al cargar la ventana
+        window.onload = init;
+    </script>
+</body>
+</html>

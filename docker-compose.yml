@@ -1,0 +1,13 @@
+services:
+  inventario:
+    build: .
+
+    container_name: inventario
+
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    volumes:
+      - ./static/uploads:/app/static/uploads
