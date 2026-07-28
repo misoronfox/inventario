@@ -2,12 +2,15 @@ services:
   inventario:
     build: .
 
-    container_name: inventario
-
     restart: unless-stopped
 
     ports:
       - "5000:5000"
 
     volumes:
-      - ./static/uploads:/app/static/uploads
+      - inventario_data:/app/data
+      - inventario_uploads:/app/static/uploads
+
+volumes:
+  inventario_data:
+  inventario_uploads:
