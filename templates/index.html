@@ -293,6 +293,11 @@
         let chartStockDistInstance = null;
         let chartConsumptionInstance = null;
 
+        // Formatear precios sin decimales, con separador de miles (formato chileno)
+        function formatPrice(value) {
+            return Math.round(Number(value)).toLocaleString('es-CL');
+        }
+
         // Cargar Dashboard inicial
         async function init() {
             await updateGlobalStats();
@@ -505,7 +510,7 @@
                             </div>
                             <div class="text-right">
                                 <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Precio</p>
-                                <p class="text-sm font-extrabold text-indigo-600">$${Number(p.price).toFixed(2)}</p>
+                                <p class="text-sm font-extrabold text-indigo-600">$${formatPrice(p.price)}</p>
                             </div>
                         </div>
                     </div>
@@ -687,7 +692,7 @@
             document.getElementById('act-category').innerText = p.subcategory_name ? `${p.category_name} (${p.subcategory_name})` : p.category_name;
             document.getElementById('act-desc').innerText = p.description || "Sin descripción.";
             document.getElementById('act-qty').innerText = p.quantity;
-            document.getElementById('act-price').innerText = `$${Number(p.price).toFixed(2)}`;
+            document.getElementById('act-price').innerText = `$${formatPrice(p.price)}`;
             document.getElementById('act-min').innerText = p.min_quantity;
 
             const badge = document.getElementById('act-badge');
@@ -842,8 +847,8 @@
                 .filter(item => !item.completed)
                 .reduce((sum, item) => sum + Number(item.price), 0);
 
-            document.getElementById('shopping-total-value').innerText = `$${totalValue.toFixed(2)}`;
-            document.getElementById('shopping-pending-value').innerText = `$${pendingValue.toFixed(2)}`;
+            document.getElementById('shopping-total-value').innerText = `$${formatPrice(totalValue)}`;
+            document.getElementById('shopping-pending-value').innerText = `$${formatPrice(pendingValue)}`;
             totalSummary.classList.remove('hidden');
 
             // Agrupar compras por categoría
@@ -875,7 +880,7 @@
                                 <span class="text-sm font-semibold ${strikeClass}">${item.name}</span>
                             </div>
                             <div class="flex items-center space-x-4">
-                                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded">$${Number(item.price).toFixed(2)}</span>
+                                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded">$${formatPrice(item.price)}</span>
                                 <button onclick="deleteShoppingItem(${item.id})" class="text-gray-400 hover:text-red-500 transition"><i data-lucide="trash" class="w-4 h-4"></i></button>
                             </div>
                         </div>
@@ -888,7 +893,7 @@
                             <span class="w-3 h-3 rounded-full bg-indigo-500"></span>
                             <h3 class="text-sm font-extrabold text-gray-900 uppercase tracking-wider">${cat}</h3>
                         </div>
-                        <span class="text-xs font-bold text-gray-500">Subtotal: $${catSubtotal.toFixed(2)}</span>
+                        <span class="text-xs font-bold text-gray-500">Subtotal: $${formatPrice(catSubtotal)}</span>
                     </div>
                     <div class="divide-y divide-gray-100">${itemsHTML}</div>
                 `;
